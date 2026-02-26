@@ -7,7 +7,7 @@ use std::arch::x86_64::{
 };
 use std::mem::MaybeUninit;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct BitpackDecoderVBMI;
 
 impl BitpackDecoderVBMI {
@@ -135,12 +135,11 @@ mod tests {
     use crate::vbmi::BitpackDecoderVBMI;
 
     fn decode8(input: &[u8]) {
-        let mut decoder = BitpackDecoderVBMI::default();
         let expected = input.iter().copied().map(u16::from).collect::<Vec<_>>();
 
         let mut output = Vec::with_capacity(expected.len());
 
-        let len = decoder
+        let len = BitpackDecoderVBMI
             .decode(input, 8, output.spare_capacity_mut())
             .unwrap();
         unsafe {
