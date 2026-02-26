@@ -9,6 +9,7 @@ pub use vbmi::*;
 pub enum DecoderError {
     InvalidBitwidth(usize),
     BufferUnderrun { available: usize, required: usize },
+    MissingTargetFeature(&'static str),
 }
 
 pub trait Decoder {

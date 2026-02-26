@@ -35,10 +35,10 @@ impl BitpackDecoderVBMI {
             _mm512_and_si512(unpacked, mask)
         }
     }
-}
 
-impl Decoder for BitpackDecoderVBMI {
-    fn decode(
+    #[inline(never)]
+    #[target_feature(enable = "avx512f,avx512vl,avx512bw,avx512vbmi")]
+    fn decode_impl(
         &mut self,
         input: &[u8],
         bitwidth: usize,
@@ -112,6 +112,20 @@ impl Decoder for BitpackDecoderVBMI {
         }
 
         Ok(elems)
+    }
+}
+
+impl Decoder for BitpackDecoderVBMI {
+    fn decode(
+        &mut self,
+        input: &[u8],
+        bitwidth: usize,
+        output: &mut [MaybeUninit<u16>],
+    ) -> Result<usize, DecoderError> {
+        if !is_x86_feature_detected!("avx512vbmi") {
+            return Err(DecoderError::MissingTargetFeature("avx512vbmi"));
+        }
+        unsafe { self.decode_impl(input, bitwidth, output) }
     }
 }
 
