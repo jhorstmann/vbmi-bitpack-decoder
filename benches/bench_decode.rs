@@ -1,18 +1,18 @@
 use bytes::Bytes;
-use criterion::{Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 use fastlanes::BitPacking;
-use parquet::util::bit_util::{BitReader, BitWriter};
+use parquet::util::bit_util::BitReader;
 
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngCore, SeedableRng};
 use vbmi_bitpack_decoder::{BitpackDecoderVBMI, Decoder};
 
 const BATCH_SIZE: usize = 4096;
 
-fn create_random_bitpacked_data(rng: &mut StdRng, bitwidth: usize) -> Vec<u8> {
-    let mut bw = BitWriter::new((BATCH_SIZE * bitwidth).div_ceil(8));
-    (0..BATCH_SIZE).for_each(|_| bw.put_value(rng.gen_range(1..(1 << bitwidth)), bitwidth));
-    bw.consume()
+fn create_random_data(rng: &mut StdRng) -> Vec<u8> {
+    let mut vec = vec![0_u8; BATCH_SIZE * size_of::<u16>()];
+    rng.fill_bytes(&mut vec);
+    vec
 }
 
 fn decode_arrow(input: Bytes, bitwidth: usize, output: &mut [u16]) -> usize {
@@ -35,19 +35,36 @@ fn decode_fastlanes(input: &[u8], bitwidth: usize, output: &mut [u16]) {
         });
 }
 
+#[inline(never)]
+fn memset(output: &mut Vec<u16>, value: u16) {
+    output.fill(value);
+}
+
 pub fn bench_decode(c: &mut Criterion) {
     let mut rng = StdRng::seed_from_u64(34563456);
+    let bitpacked = Bytes::from(create_random_data(&mut rng));
+    let mut output = vec![0; BATCH_SIZE];
+
+    {
+        let mut group = c.benchmark_group("memset");
+        group.throughput(Throughput::Elements(BATCH_SIZE as u64));
+        group.bench_function("memset", |b| {
+            b.iter(|| {
+                assert_eq!(output.len(), BATCH_SIZE);
+                memset(&mut output, black_box(0xABCD_u16));
+            })
+        });
+    }
 
     {
         let mut group = c.benchmark_group("decode_bitpacked");
         group.throughput(Throughput::Elements(BATCH_SIZE as u64));
 
         for bitwidth in 1..=16 {
-            let bitpacked = Bytes::from(create_random_bitpacked_data(&mut rng, bitwidth));
-            let mut output = Vec::with_capacity(BATCH_SIZE);
-
+            output.clear();
             group.bench_function(format!("vbmi-bitwidth-{bitwidth}"), |b| {
                 b.iter(|| {
+                    assert_eq!(output.spare_capacity_mut().len(), BATCH_SIZE);
                     BitpackDecoderVBMI
                         .decode(&bitpacked, bitwidth, &mut output.spare_capacity_mut())
                         .unwrap()
@@ -55,10 +72,11 @@ pub fn bench_decode(c: &mut Criterion) {
             });
 
             output.resize(BATCH_SIZE, 0);
-
             group.bench_function(format!("arrow-bitwidth-{bitwidth}"), |b| {
                 b.iter(|| decode_arrow(bitpacked.clone(), bitwidth, &mut output))
             });
+
+            output.resize(BATCH_SIZE, 0);
             group.bench_function(format!("fastlanes-bitwidth-{bitwidth}"), |b| {
                 b.iter(|| decode_fastlanes(&bitpacked, bitwidth, &mut output))
             });
