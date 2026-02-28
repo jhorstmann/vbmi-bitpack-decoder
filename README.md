@@ -1,10 +1,10 @@
 # Blazing fast bitpack decoding using avx512-vbmi instructions
 
-The [avx512-vbmi instruction set](vbmi) introduces two instructions that are very useful for
+The [avx512-vbmi instruction set][vbmi] introduces two instructions that are very useful for
 decoding bitpacked data.
 
- - [`vpermb`](vpermb) (`__mm512_permutexvar_epi8`): Shuffles 8-bit integers across lanes.
- - [`vpmultishiftqb`](vpmultishiftqb) (`_mm512_multishift_epi64_epi8`): Creates 8 8-bit integers
+ - [`vpermb`][vpermb] (`__mm512_permutexvar_epi8`): Shuffles 8-bit integers across lanes.
+ - [`vpmultishiftqb`][vpmultishiftqb] (`_mm512_multishift_epi64_epi8`): Creates 8 8-bit integers
    per 64-bit lane by shifting that 64-bit word by an arbitrary amount.   
 
 Combining these two instructions with masked loads allows to build a fully table-driven bitpack
