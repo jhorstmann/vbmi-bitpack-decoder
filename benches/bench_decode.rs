@@ -29,8 +29,8 @@ fn decode_fastlanes(input: &[u8], bitwidth: usize, output: &mut [u16]) {
         .0
         .into_iter()
         .for_each(|out_chunk| {
-            assert!(input.len() >= in_chunk_len);
-            unsafe { u16::unchecked_unpack(bitwidth, input, out_chunk) }
+            let in_chunk = &input[..in_chunk_len];
+            unsafe { u16::unchecked_unpack(bitwidth, in_chunk, out_chunk) }
             input = &input[in_chunk_len..];
         });
 }
@@ -61,6 +61,8 @@ pub fn bench_decode(c: &mut Criterion) {
         group.throughput(Throughput::Elements(BATCH_SIZE as u64));
 
         for bitwidth in 1..=16 {
+            let bitpacked = bitpacked.slice(0..BATCH_SIZE * bitwidth / 8);
+
             output.clear();
             group.bench_function(format!("vbmi-bitwidth-{bitwidth}"), |b| {
                 b.iter(|| {
